@@ -5,10 +5,19 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 
+"""CLI tool for estimating the total value of coins in images.
+
+The script reads a directory with images and a CSV file containing ground truth
+values, detects coins using HSV masking and contours, estimates the summed
+value, and computes MAE against the ground truth.
+"""
+
 def load_image(path):
+    """Load an image from disk and return it in RGB format."""
     return cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
 
 def display_image(image, color=False, ax=None, title=None):
+    """Display an image (RGB or grayscale) on the provided axis without axes."""
     if ax is None:
         ax = plt.gca()
     if color:
@@ -20,7 +29,9 @@ def display_image(image, color=False, ax=None, title=None):
         ax.set_title(title)
 
 def build_mask(hsv, s_thr=80, v_thr=90):
+    """Create a binary mask for coins from an HSV image (with opening/closing)."""
     h, s, v = cv2.split(hsv)
+    # Keep high-saturation, high-value pixels with hue outside the green range.
     mask = (((h < 60) | (h > 170)) & (s > s_thr) & (v > v_thr)).astype("uint8")
     kernel = np.ones((3, 3), np.uint8)
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
@@ -28,7 +39,9 @@ def build_mask(hsv, s_thr=80, v_thr=90):
     return mask, h
 
 def component_value(h_vals):
+    """Assign a coin value to a contour based on its mean hue component."""
     mean_h = h_vals.mean()
+    # Hue buckets tuned to distinguish coin types: red, gold, and star.
     if mean_h < 10 or mean_h > 170:
         return 2  # crveni
     if mean_h < 35:
@@ -37,6 +50,7 @@ def component_value(h_vals):
 
 
 def visualize_steps(img, hsv, mask, contours, accepted, name, pred=None, truth=None):
+    """Show key processing steps and the hue histogram."""
     fig, axes = plt.subplots(2, 3, figsize=(12, 8))
     if pred is not None or truth is not None:
         fig.suptitle(f"Prediction: {pred} | Ground truth: {truth}", fontsize=14)
@@ -72,6 +86,7 @@ def visualize_steps(img, hsv, mask, contours, accepted, name, pred=None, truth=N
 
 
 def estimate_value(img, show=False, name="", truth=None):
+    """Estimate the total coin value in an image, optionally showing steps."""
     hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
     mask, h = build_mask(hsv)
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -100,6 +115,7 @@ def estimate_value(img, show=False, name="", truth=None):
 
 
 def parse_args():
+    """Define CLI arguments and return parsed values."""
     parser = argparse.ArgumentParser(description="Estimate coin values with optional visualization of steps.")
     parser.add_argument("data_dir", help="Path to directory with images and coin_value_count.csv.")
     parser.add_argument("--show", action="store_true", help="Show graphical intermediate steps.")
@@ -107,6 +123,7 @@ def parse_args():
 
 
 def main():
+    """Run the CLI flow: load data, compute predictions, and print MAE."""
     args = parse_args()
     data_dir = args.data_dir
     csv_path = os.path.join(data_dir, "coin_value_count.csv")
@@ -116,9 +133,9 @@ def main():
         img = load_image(os.path.join(data_dir, name))
         truth = int(gt.loc[gt.image_name == name, "coins_value"].iloc[0])
         preds[name] = estimate_value(img, show=args.show, name=name, truth=truth)
-        #print(f"{name}: pred={preds[name]}, truth={truth}")
+        print(f"{name}: pred={preds[name]}, truth={truth}")
     mae = np.mean(np.abs(gt["coins_value"] - gt["image_name"].map(preds)))
-    print(mae)
+    print(f"Mean Absolute Error (MAE): {mae}")
 
 if __name__ == "__main__":
     main()
