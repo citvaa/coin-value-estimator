@@ -43,10 +43,10 @@ def component_value(h_vals):
     mean_h = h_vals.mean()
     # Hue buckets tuned to distinguish coin types: red, gold, and star.
     if mean_h < 10 or mean_h > 170:
-        return 2  # crveni
+        return 2  # red
     if mean_h < 35:
-        return 1  # zlatni
-    return 5      # zvezdani
+        return 1  # gold
+    return 5      # star
 
 
 def visualize_steps(img, hsv, mask, contours, accepted, name, pred=None, truth=None):
